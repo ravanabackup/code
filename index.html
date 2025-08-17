@@ -80,12 +80,47 @@
             position: relative;
             margin-bottom: 1.5rem;
         }
+        
+        /* New styles for collapsible sections */
+        details {
+            margin-top: 0.75rem;
+        }
+
+        summary {
+            cursor: pointer;
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.25rem;
+            color: #90cdf4;
+            transition: background-color 0.2s;
+            list-style: none; /* Hide default triangle */
+        }
+        
+        summary::-webkit-details-marker {
+            display: none;
+        }
+
+        summary:hover {
+            background-color: #4a5568;
+        }
+        
+        summary:before {
+            content: '+';
+            font-family: sans-serif;
+            margin-right: 0.5rem;
+            transition: transform 0.2s;
+            font-weight: bold;
+            display: inline-block;
+        }
+
+        details[open] > summary:before {
+            content: '−';
+            transform: rotate(180deg);
+        }
 
         .code-chunk-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 0.75rem;
         }
 
         .code-chunk-header span {
@@ -101,6 +136,7 @@
             font-size: 0.875rem;
             line-height: 1.4;
             color: #e2e8f0;
+            padding-top: 0.75rem;
         }
         
         .loader {
@@ -174,7 +210,8 @@
         fetchBtn.addEventListener('click', async () => {
             const url = urlInput.value.trim();
             if (!url) {
-                alert('Please enter a valid URL.');
+                // Use a custom message box instead of alert()
+                showCustomMessage('Please enter a valid URL.');
                 return;
             }
 
@@ -241,19 +278,28 @@
                 copyBtn.className = 'btn btn-secondary text-xs';
                 copyBtn.textContent = 'Copy';
 
+                // Use <details> for a collapsible section
+                const details = document.createElement('details');
+
+                const summary = document.createElement('summary');
+                summary.textContent = `Part ${partNumber} of ${totalParts}`;
+
                 const pre = document.createElement('pre');
                 pre.textContent = chunk;
 
                 header.appendChild(span);
                 header.appendChild(copyBtn);
                 chunkContainer.appendChild(header);
-                chunkContainer.appendChild(pre);
+
+                details.appendChild(summary);
+                details.appendChild(pre);
+                chunkContainer.appendChild(details);
                 
                 outputContainer.appendChild(chunkContainer);
 
                 // Add copy functionality to the button
                 copyBtn.addEventListener('click', () => {
-                    const textToCopy = pre.textContent;
+                    const textToCopy = chunk;
                     try {
                         const tempTextarea = document.createElement('textarea');
                         tempTextarea.value = textToCopy;
