@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code Splitter</title>
+    <!-- Load Tailwind CSS for modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for a dark, code-editor-like theme */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a202c;
+            color: #e2e8f0;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: auto;
+            padding: 2rem;
+        }
+
+        .input-area, .output-area {
+            background-color: #2d3748;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        textarea {
+            width: 100%;
+            height: 400px;
+            background-color: #1a202c;
+            border: 1px solid #4a5568;
+            color: #a0aec0;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            resize: vertical;
+            font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+            font-size: 0.875rem;
+        }
+        
+        input[type="text"] {
+            width: 100%;
+            background-color: #1a202c;
+            border: 1px solid #4a5568;
+            color: #a0aec0;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: bold;
+            transition: background-color 0.2s;
+        }
+
+        .btn-primary {
+            background-color: #4c51bf;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #3f479f;
+        }
+
+        .btn-secondary {
+            background-color: #4a5568;
+            color: #e2e8f0;
+        }
+        .btn-secondary:hover {
+            background-color: #2d3748;
+        }
+
+        .code-chunk {
+            background-color: #1a202c;
+            border: 1px solid #4a5568;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            position: relative;
+            margin-bottom: 1.5rem;
+        }
+
+        .code-chunk-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+
+        .code-chunk-header span {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #a0aec0;
+        }
+
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+            font-size: 0.875rem;
+            line-height: 1.4;
+            color: #e2e8f0;
+        }
+        
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="antialiased">
+    <div class="container">
+        <h1 class="text-4xl font-extrabold text-center mb-6 text-white">Code Splitter</h1>
+        <p class="text-center text-gray-400 mb-8">Paste your code below or fetch it from a URL to split it into 500-line chunks.</p>
+
+        <div class="input-area mb-8">
+            <h2 class="text-xl font-semibold mb-4 text-white">Input Code</h2>
+            
+            <div class="flex items-end gap-4 mb-4">
+                <div class="flex-grow">
+                    <label for="url-input" class="block text-sm font-medium text-gray-400 mb-1">Or fetch from URL</label>
+                    <input type="text" id="url-input" placeholder="e.g., https://example.com/my-code.txt" class="w-full">
+                </div>
+                <button id="fetch-btn" class="btn btn-secondary">
+                    <span id="fetch-text">Fetch Code</span>
+                </button>
+            </div>
+            
+            <textarea id="code-input" placeholder="Paste your code here..."></textarea>
+            
+            <div class="flex justify-between items-center mt-4">
+                <span id="line-count" class="text-sm font-medium text-gray-400">Lines: 0</span>
+                <button id="split-btn" class="btn btn-primary">Split Code</button>
+            </div>
+        </div>
+        
+        <div id="output-container" class="output-area">
+            <h2 class="text-xl font-semibold mb-4 text-white">Split Chunks</h2>
+            <p id="output-message" class="text-center text-gray-400">Your split code will appear here.</p>
+        </div>
+    </div>
+
+    <script>
+        // Get all necessary DOM elements
+        const codeInput = document.getElementById('code-input');
+        const urlInput = document.getElementById('url-input');
+        const fetchBtn = document.getElementById('fetch-btn');
+        const fetchText = document.getElementById('fetch-text');
+        const splitBtn = document.getElementById('split-btn');
+        const outputContainer = document.getElementById('output-container');
+        const outputMessage = document.getElementById('output-message');
+        const lineCountSpan = document.getElementById('line-count');
+        
+        // The number of lines per chunk
+        const CHUNK_SIZE = 500;
+
+        // Update the line count in real-time
+        codeInput.addEventListener('input', () => {
+            const lines = codeInput.value.split('\n').length;
+            lineCountSpan.textContent = `Lines: ${lines}`;
+        });
+
+        // Function to fetch code from a URL
+        fetchBtn.addEventListener('click', async () => {
+            const url = urlInput.value.trim();
+            if (!url) {
+                alert('Please enter a valid URL.');
+                return;
+            }
+
+            // Show a loading indicator
+            fetchText.innerHTML = `<div class="loader"></div>`;
+            fetchBtn.disabled = true;
+
+            try {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const text = await response.text();
+                codeInput.value = text;
+                // Update the line count after fetching
+                const lines = text.split('\n').length;
+                lineCountSpan.textContent = `Lines: ${lines}`;
+            } catch (error) {
+                outputMessage.textContent = `Error fetching data: ${error.message}`;
+            } finally {
+                // Hide the loading indicator
+                fetchText.textContent = `Fetch Code`;
+                fetchBtn.disabled = false;
+            }
+        });
+
+        // Function to split the code
+        splitBtn.addEventListener('click', () => {
+            const code = codeInput.value;
+            const lines = code.split('\n');
+            const totalLines = lines.length;
+
+            if (totalLines === 0) {
+                outputMessage.textContent = 'Please enter some code to split.';
+                outputContainer.innerHTML = `<h2 class="text-xl font-semibold mb-4 text-white">Split Chunks</h2><p id="output-message" class="text-center text-gray-400">Please enter some code to split.</p>`;
+                return;
+            }
+
+            // Clear previous output
+            outputContainer.innerHTML = '';
+            
+            // Add a heading for the split chunks
+            const heading = document.createElement('h2');
+            heading.className = "text-xl font-semibold mb-4 text-white";
+            heading.textContent = "Split Chunks";
+            outputContainer.appendChild(heading);
+
+            // Iterate and create chunks
+            for (let i = 0; i < totalLines; i += CHUNK_SIZE) {
+                const chunk = lines.slice(i, i + CHUNK_SIZE).join('\n');
+                const partNumber = Math.floor(i / CHUNK_SIZE) + 1;
+                const totalParts = Math.ceil(totalLines / CHUNK_SIZE);
+
+                const chunkContainer = document.createElement('div');
+                chunkContainer.className = 'code-chunk';
+                
+                const header = document.createElement('div');
+                header.className = 'code-chunk-header';
+                
+                const span = document.createElement('span');
+                span.textContent = `Part ${partNumber} of ${totalParts}`;
+                
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'btn btn-secondary text-xs';
+                copyBtn.textContent = 'Copy';
+
+                const pre = document.createElement('pre');
+                pre.textContent = chunk;
+
+                header.appendChild(span);
+                header.appendChild(copyBtn);
+                chunkContainer.appendChild(header);
+                chunkContainer.appendChild(pre);
+                
+                outputContainer.appendChild(chunkContainer);
+
+                // Add copy functionality to the button
+                copyBtn.addEventListener('click', () => {
+                    const textToCopy = pre.textContent;
+                    try {
+                        const tempTextarea = document.createElement('textarea');
+                        tempTextarea.value = textToCopy;
+                        document.body.appendChild(tempTextarea);
+                        tempTextarea.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(tempTextarea);
+                        copyBtn.textContent = 'Copied!';
+                        setTimeout(() => {
+                            copyBtn.textContent = 'Copy';
+                        }, 2000);
+                    } catch (err) {
+                        console.error('Failed to copy text: ', err);
+                        copyBtn.textContent = 'Error!';
+                    }
+                });
+            }
+            
+            // If output is generated, hide the placeholder message
+            outputMessage.style.display = 'none';
+        });
+    </script>
+</body>
+</html>
